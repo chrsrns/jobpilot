@@ -15,5 +15,6 @@ Set these provider values for the shared workflow:
 - `JOBPILOT_WORKSPACE_ROOT` is the current JobPilot repository/workspace root.
 - `<tailor-resume-command>` = `/jobpilot:tailor-resume`
 - `<humanizer-command>` = `/jobpilot:humanizer`
+- `<extract-resume-command>` = `/jobpilot:extract-resume`
 
 Read and follow `${JOBPILOT_SKILLS_ROOT}/skills/tailor-resume.md`.
