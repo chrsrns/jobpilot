@@ -50,5 +50,8 @@ public abstract class Provider
     /// <summary>Mirrors the web's formatSkillCommand.</summary>
     public virtual string SkillCommand(string skill) => $"/jobpilot:{skill}";
 
+    /// <summary>Clears the conversation before a pilot run. All supported CLIs take /clear.</summary>
+    public virtual string ClearCommand => "/clear";
+
     public virtual int SubmitKeyPresses(string command) => 1;
 }
