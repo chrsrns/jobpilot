@@ -10,7 +10,6 @@ namespace JobPilot.Terminal.Pilot.Agent;
 public sealed class PilotAgent : IPilotAgent, IDisposable
 {
     private const string PilotSkill = "pilot";
-    private const string ClearCommand = "/clear";
     private const int Cols = 220;
     private const int Rows = 50;
     private const int MaxSteerLength = 1000;
@@ -89,7 +88,7 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
     {
         // Cycles keep their state in the API. Clearing first prevents mid-cycle auto-compaction and keeps
         // untrusted page content from lingering into the next cycle.
-        await SendAsync(ClearCommand, provider, ct);
+        await SendAsync(provider.ClearCommand, provider, ct);
         await Task.Delay(ClearSettle, ct);
 
         while (signals.Reader.TryRead(out _))
