@@ -10,8 +10,9 @@ public abstract class Provider
 {
     public static readonly Provider Claude = new ClaudeProvider();
     public static readonly Provider Codex = new CodexProvider();
+    public static readonly Provider Devin = new DevinProvider();
 
-    public static readonly Provider[] All = [Claude, Codex];
+    public static readonly Provider[] All = [Claude, Codex, Devin];
 
     public static readonly ProviderInfo[] Infos = [.. All.Select(p => p.Info)];
 
