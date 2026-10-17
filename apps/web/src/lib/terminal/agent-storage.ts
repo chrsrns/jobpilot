@@ -57,7 +57,7 @@ export function subscribeAgentStorage(listener: () => void): () => void {
 
 export function readStoredProvider(): TerminalProviderId {
   const provider = readAgentStorage()?.provider;
-  return provider === "codex" || provider === "claude" ? provider : "claude";
+  return provider === "codex" || provider === "devin" || provider === "claude" ? provider : "claude";
 }
 
 export function readStoredDrawerOpen(): boolean {

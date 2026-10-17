@@ -23,7 +23,7 @@ import { AgentUpdateBanner } from "./update/update-banner";
 import { useAgentActivity } from "./use-agent-activity";
 import { type AgentHealthState, useAgentHealth } from "./use-agent-health";
 
-const PROVIDERS: TerminalProviderId[] = ["claude", "codex"];
+const PROVIDERS: TerminalProviderId[] = ["claude", "codex", "devin"];
 
 export function AgentPanel(): ReactElement {
   const { closeDrawer, drawerTab, setDrawerTab, provider, switchProvider, restart, stop } =
