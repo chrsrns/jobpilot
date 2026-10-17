@@ -24,15 +24,20 @@ public sealed class PairingStoreTests : IDisposable
         UserId = userId,
     };
 
-    [Fact]
-    public void Save_RoundTripsThroughAFreshStore()
+    [Theory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    [InlineData("devin")]
+    public void Save_RoundTripsThroughAFreshStore(string providerId)
     {
-        NewStore().Save(SavedPairing());
+        var pairing = SavedPairing() with { Provider = Provider.Parse(providerId) };
+
+        NewStore().Save(pairing);
 
         var reloaded = NewStore().Current;
 
         Assert.NotNull(reloaded);
-        Assert.Same(Provider.Codex, reloaded!.Provider);
+        Assert.Same(Provider.Parse(providerId), reloaded!.Provider);
         Assert.Equal(new ApiConnection("https://api.example", "https://web.example", "secret-token"), reloaded.Api);
         Assert.Equal("user-1", reloaded.UserId);
     }
