@@ -6,7 +6,8 @@ using JobPilot.Terminal.Pilot.Telemetry;
 using JobPilot.Terminal.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
-// Pty.Net's forkpty path requires CoreCLR's W^X remapping to be off on Unix; harmless under NativeAOT.
+// Pty.Net refuses to spawn without this env var. The real W^X toggle is read at CLR boot, so
+// CoreCLR hosts get it from runtimeconfig.template.json; this set only satisfies Pty.Net's check.
 if (!OperatingSystem.IsWindows())
 {
     Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
