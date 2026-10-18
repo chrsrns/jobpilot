@@ -6,8 +6,8 @@ using JobPilot.Terminal.Pilot.Telemetry;
 using JobPilot.Terminal.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
-// Pty.Net's macOS forkpty path requires CoreCLR's W^X remapping to be off; harmless under NativeAOT.
-if (OperatingSystem.IsMacOS())
+// Pty.Net's forkpty path requires CoreCLR's W^X remapping to be off on Unix; harmless under NativeAOT.
+if (!OperatingSystem.IsWindows())
 {
     Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
 }
