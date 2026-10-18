@@ -120,7 +120,7 @@ async function openSession(
     const message = (err as Error).message;
     terminal.writeln(notice(RED, `failed to start session: ${message}`));
 
-    if (/Failed to start '(claude|codex)'/.test(message)) {
+    if (/Failed to start '(claude|codex|devin)'/.test(message)) {
       terminal.writeln(
         notice(
           YELLOW,
