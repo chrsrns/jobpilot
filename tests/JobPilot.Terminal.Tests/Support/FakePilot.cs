@@ -67,10 +67,19 @@ internal sealed class FakePilot : IPilotAgent, IPilotApi
 
     public Provider? RunningProvider { get; set; }
 
-    public void Start(PilotPairing pairing)
+    /// <summary>Force Start to report a spawn even with a session already running (the unattended upgrade).</summary>
+    public bool ForceStart { get; set; }
+
+    public bool Start(PilotPairing pairing)
     {
+        if (RunningProvider is not null && !ForceStart)
+        {
+            return false;
+        }
+
         Record("start");
         RunningProvider = pairing.Provider;
+        return true;
     }
 
     public Task SendCycleAsync(Provider provider, string runId, CancellationToken ct)
