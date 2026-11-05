@@ -67,7 +67,7 @@ public sealed class TerminalSession : IDisposable
 
     /// <summary>Starts a provider unless it is already running, replacing any other one.</summary>
     /// <exception cref="PtyStartException">The process could not be spawned.</exception>
-    public void Start(Provider provider, int cols, int rows, ApiConnection api)
+    public void Start(Provider provider, int cols, int rows, ApiConnection api, bool unattended = false)
     {
         lock (sync)
         {
@@ -89,7 +89,7 @@ public sealed class TerminalSession : IDisposable
             }
 
             scratch.CleanForNewSession(paths);
-            var args = provider.BuildArgs(paths.PluginDir, logger);
+            var args = provider.BuildArgs(paths.PluginDir, logger, unattended);
             logger.LogInformation(
                 "Starting {Provider}: cwd={Cwd} executable={Executable} args={Args} cols={Cols} rows={Rows}",
                 provider.DisplayName,

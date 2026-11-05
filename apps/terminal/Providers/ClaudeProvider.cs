@@ -8,7 +8,7 @@ internal sealed class ClaudeProvider : Provider
 
     public override string Executable => "claude";
 
-    public override string[] BuildArgs(string pluginDir, ILogger logger)
+    public override string[] BuildArgs(string pluginDir, ILogger logger, bool unattended = false)
     {
         // Auto mode is a flag, not a settings key, so it holds even when the shipped file is missing.
         List<string> args = ["--permission-mode", "auto"];
