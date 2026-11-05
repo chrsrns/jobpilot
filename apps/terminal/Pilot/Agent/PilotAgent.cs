@@ -187,8 +187,22 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
 
     public void Dispose() => terminal.Output -= OnOutput;
 
+    private long lastOutputTicks;
+
+    // Type into a quiet TUI: input written while it draws or boots can reach canonical stdin,
+    // where ICRNL rewrites Enter into a newline instead of a submit.
+    private static readonly TimeSpan SendQuietWindow = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan SendQuietMaxWait = TimeSpan.FromSeconds(30);
+
     private async Task SendAsync(string command, Provider provider, CancellationToken ct)
     {
+        var deadline = DateTimeOffset.UtcNow + SendQuietMaxWait;
+        while (DateTimeOffset.UtcNow - new DateTimeOffset(Interlocked.Read(ref lastOutputTicks), TimeSpan.Zero) < SendQuietWindow
+            && DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(50, ct);
+        }
+
         var result = await terminal.SendCommandAsync(command, provider, ct);
         if (result != SendResult.Sent)
         {
@@ -198,6 +212,8 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
 
     private void OnOutput(byte[] data)
     {
+        Interlocked.Exchange(ref lastOutputTicks, DateTimeOffset.UtcNow.Ticks);
+
         // Only a run in flight can be stuck; output between runs is the user's own session.
         if (run is null)
         {
