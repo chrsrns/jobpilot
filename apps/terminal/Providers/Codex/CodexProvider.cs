@@ -17,7 +17,7 @@ internal sealed class CodexProvider : Provider
     public override string Executable => "codex";
 
     // The PTY already sets the cwd; repeating it through -C makes Windows paths cross a second argument parser.
-    public override string[] BuildArgs(string pluginDir, ILogger logger) =>
+    public override string[] BuildArgs(string pluginDir, ILogger logger, bool unattended = false) =>
         ["--no-alt-screen", "--approve-for-me", .. CodexConfig.Overrides(pluginDir, logger, ExecutablePath.Find).SelectMany(o => new[] { "-c", o })];
 
     /// <summary>Codex discovers skills from .agents/skills and agents from .codex/agents, both wholly ours to rebuild.</summary>

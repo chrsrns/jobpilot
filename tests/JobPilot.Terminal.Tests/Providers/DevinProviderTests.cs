@@ -15,11 +15,22 @@ public sealed class DevinProviderTests : IDisposable
     public void Dispose() => temp.Dispose();
 
     [Fact]
-    public void BuildArgs_SkipsTrustPrompt_AndRunsUnattended()
+    public void BuildArgs_SkipsTrustPrompt_AndRunsSmart()
     {
         Assert.Equal(
             ["--permission-mode", "smart", "--respect-workspace-trust", "false"],
             Provider.Devin.BuildArgs(temp.Root, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance));
+    }
+
+    [Fact]
+    public void BuildArgs_Unattended_RunsBypass()
+    {
+        Assert.Equal(
+            ["--permission-mode", "bypass", "--respect-workspace-trust", "false"],
+            Provider.Devin.BuildArgs(
+                temp.Root,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+                unattended: true));
     }
 
     [Fact]

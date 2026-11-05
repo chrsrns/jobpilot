@@ -14,8 +14,9 @@ internal sealed class DevinProvider : Provider
     public override string Executable => "devin";
 
     // Trust prompt would intercept the host's first typed command; the workspace is managed, so skipping is safe.
-    public override string[] BuildArgs(string pluginDir, ILogger logger) =>
-        ["--permission-mode", "smart", "--respect-workspace-trust", "false"];
+    // Unattended gets bypass: any permission prompt would stall a pilot run with nobody to answer it.
+    public override string[] BuildArgs(string pluginDir, ILogger logger, bool unattended = false) =>
+        ["--permission-mode", unattended ? "bypass" : "smart", "--respect-workspace-trust", "false"];
 
     // Devin loads skills unprefixed from .agents/skills, and a single Enter submits typed commands.
     public override string SkillCommand(string skill) => $"/{skill}";

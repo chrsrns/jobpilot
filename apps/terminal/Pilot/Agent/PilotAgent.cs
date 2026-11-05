@@ -82,7 +82,7 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
     }
 
     public void Start(PilotPairing pairing) =>
-        terminal.Start(pairing.Provider, Cols, Rows, pairing.Api);
+        terminal.Start(pairing.Provider, Cols, Rows, pairing.Api, unattended: true);
 
     public async Task SendCycleAsync(Provider provider, string runId, CancellationToken ct)
     {

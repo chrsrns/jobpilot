@@ -40,7 +40,8 @@ public abstract class Provider
     }
 
     /// <summary>Launch arguments, reading the provider's shipped settings from the plugin dir.</summary>
-    public abstract string[] BuildArgs(string pluginDir, ILogger logger);
+    /// <param name="unattended">Pilot runs only - no human watches the session to answer prompts.</param>
+    public abstract string[] BuildArgs(string pluginDir, ILogger logger, bool unattended = false);
 
     /// <summary>Runs before the outgoing session stops, so a failure here leaves that session alive.</summary>
     public virtual void PrepareWorkspace(InstallPaths paths)
