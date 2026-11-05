@@ -35,6 +35,7 @@ public sealed class TerminalSession : IDisposable
 
     private volatile PtyProcess? current;
     private volatile Provider activeProvider = Provider.Claude;
+    private bool activeUnattended;
 
     public TerminalSession(HostInstall install, ScratchCleaner scratch, ILogger<TerminalSession> logger)
         : this(install, scratch, logger, PtyProcess.SpawnWithPtyNet)
@@ -72,7 +73,8 @@ public sealed class TerminalSession : IDisposable
         lock (sync)
         {
             var paths = install.RequirePaths();
-            if (current is not null && provider == activeProvider)
+            // An unattended request upgrades an interactive session; a normal start never downgrades one.
+            if (current is not null && provider == activeProvider && (!unattended || activeUnattended))
             {
                 logger.LogInformation("{Provider} session already running; Start is a no-op.", provider.Id);
                 return;
@@ -83,7 +85,12 @@ public sealed class TerminalSession : IDisposable
 
             if (current is not null)
             {
-                logger.LogInformation("Switching terminal provider from {Previous} to {Next}.", activeProvider.Id, provider.Id);
+                logger.LogInformation(
+                    "Replacing {Previous} session with {Next} (unattended {PrevMode} -> {NextMode}).",
+                    activeProvider.Id,
+                    provider.Id,
+                    activeUnattended,
+                    unattended);
                 current.Dispose();
                 current = null;
             }
@@ -127,6 +134,7 @@ public sealed class TerminalSession : IDisposable
 
             current = process;
             activeProvider = provider;
+            activeUnattended = unattended;
         }
     }
 

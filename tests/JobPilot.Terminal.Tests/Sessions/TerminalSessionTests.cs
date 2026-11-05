@@ -77,6 +77,23 @@ public sealed class TerminalSessionTests : IDisposable
     }
 
     [Fact]
+    public void Start_UnattendedRespawnsAnInteractiveSession_WithoutDowngradingBack()
+    {
+        Start(Provider.Devin);
+        var interactive = Live;
+
+        session.Start(Provider.Devin, 80, 24, unattended: true);
+
+        Assert.Equal(2, spawned.Count);
+        Assert.Equal(1, interactive.KillCalls);
+        Assert.Contains("bypass", lastOptions!.CommandLine);
+
+        // A plain start on the unattended session is a no-op, not a downgrade.
+        session.Start(Provider.Devin, 80, 24);
+        Assert.Equal(2, spawned.Count);
+    }
+
+    [Fact]
     public void Start_ReplacesAnotherProvider_AndKillsItsProcess()
     {
         Start(Provider.Claude);
