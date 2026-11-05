@@ -67,8 +67,9 @@ public sealed class TerminalSession : IDisposable
     public Provider ActiveProvider => activeProvider;
 
     /// <summary>Starts a provider unless it is already running, replacing any other one.</summary>
+    /// <returns>True when a new process spawned (fresh start or respawn), false on a no-op.</returns>
     /// <exception cref="PtyStartException">The process could not be spawned.</exception>
-    public void Start(Provider provider, int cols, int rows, ApiConnection api, bool unattended = false)
+    public bool Start(Provider provider, int cols, int rows, ApiConnection api, bool unattended = false)
     {
         lock (sync)
         {
@@ -77,7 +78,7 @@ public sealed class TerminalSession : IDisposable
             if (current is not null && provider == activeProvider && (!unattended || activeUnattended))
             {
                 logger.LogInformation("{Provider} session already running; Start is a no-op.", provider.Id);
-                return;
+                return false;
             }
 
             // Before the outgoing session stops, so a failed preparation leaves it alive.
@@ -135,6 +136,7 @@ public sealed class TerminalSession : IDisposable
             current = process;
             activeProvider = provider;
             activeUnattended = unattended;
+            return true;
         }
     }
 
