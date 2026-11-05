@@ -2,7 +2,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
-using JobPilot.Terminal.Hosting;
+using JobPilot.Terminal.Pilot.Agent;
 
 namespace JobPilot.Terminal.Sessions.Relay;
 
@@ -43,9 +43,11 @@ public sealed class TerminalRelay : IDisposable
 
         lock (sync)
         {
-            foreach (var chunk in replay.Chunks)
+            if (replay.Chunks.Count > 0)
             {
-                outbox.Writer.TryWrite(chunk);
+                // Concat once so a query split across chunks can't slip the filter through.
+                var text = Encoding.UTF8.GetString(replay.Chunks.SelectMany(c => c).ToArray());
+                outbox.Writer.TryWrite(Encoding.UTF8.GetBytes(Ansi.StripElicits(text)));
             }
 
             clients[socket] = outbox;
