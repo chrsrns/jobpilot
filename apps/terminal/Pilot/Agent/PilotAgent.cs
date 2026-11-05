@@ -89,6 +89,12 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
         // Cycles keep their state in the API. Clearing first prevents mid-cycle auto-compaction and keeps
         // untrusted page content from lingering into the next cycle.
         await SendAsync(provider.ClearCommand, provider, ct);
+        if (provider.UnattendedCommand is { } unattended)
+        {
+            // A shared dock session spawns interactive; args can't flip it, the in-session command can.
+            await SendAsync(unattended, provider, ct);
+        }
+
         await Task.Delay(ClearSettle, ct);
 
         while (signals.Reader.TryRead(out _))

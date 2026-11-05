@@ -34,6 +34,9 @@ public sealed class DevinProviderTests : IDisposable
     }
 
     [Fact]
+    public void UnattendedCommand_IsBypass() => Assert.Equal("/bypass", Provider.Devin.UnattendedCommand);
+
+    [Fact]
     public void PrepareWorkspace_CopiesSkills_KeepingSetup()
     {
         temp.File(Path.Combine("plugin", "skills", "pilot", "SKILL.md"), "# pilot");

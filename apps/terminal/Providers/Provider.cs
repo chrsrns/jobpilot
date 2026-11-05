@@ -54,5 +54,8 @@ public abstract class Provider
     /// <summary>Clears the conversation before a pilot run. All supported CLIs take /clear.</summary>
     public virtual string ClearCommand => "/clear";
 
+    /// <summary>In-session command flipping a shared interactive session to unattended mode; null when the provider has none.</summary>
+    public virtual string? UnattendedCommand => null;
+
     public virtual int SubmitKeyPresses(string command) => 1;
 }

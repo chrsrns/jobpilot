@@ -21,6 +21,9 @@ internal sealed class DevinProvider : Provider
     // Devin loads skills unprefixed from .agents/skills, and a single Enter submits typed commands.
     public override string SkillCommand(string skill) => $"/{skill}";
 
+    // Bypass applies at spawn only via args; a shared dock session needs the in-session flip instead.
+    public override string UnattendedCommand => "/bypass";
+
     /// <summary>Devin reads .agents/skills and .devin/mcp_config.local.json from the session cwd; both are ours to rebuild.</summary>
     public override void PrepareWorkspace(InstallPaths paths)
     {
