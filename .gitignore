@@ -41,3 +41,7 @@ dist/
 .env
 
 __pycache__/
+
+# Agent scratch output when a worker runs with the repo as cwd
+$JOBPILOT_TEMP/
+.git-shadow.env
