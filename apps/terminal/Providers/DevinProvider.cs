@@ -24,6 +24,10 @@ internal sealed class DevinProvider : Provider
     // Bypass applies at spawn only via args; a shared dock session needs the in-session flip instead.
     public override string UnattendedCommand => "/bypass";
 
+    // Devin detaches stdin while session internals respawn (after /clear); bytes typed into the gap
+    // get flushed or batch-read as pasted text. The idle marker lands once the reader is back.
+    public override byte[]? InputReadyPattern => "\x1b]7501;state=idle"u8.ToArray();
+
     /// <summary>Devin reads .agents/skills and .devin/mcp_config.local.json from the session cwd; both are ours to rebuild.</summary>
     public override void PrepareWorkspace(InstallPaths paths)
     {

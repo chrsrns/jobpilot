@@ -35,8 +35,18 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
 
     // One reference, so a reader never sees a run id paired with another run's provider.
     private volatile HandedRun? run;
+    private long inputReadyCount;
+    private byte[]? markerTail;
+    private readonly TimeSpan inputReadyTimeout;
 
-    public PilotAgent(TerminalSession terminal, PairingStore store, IPilotApi api, UsageMeter usage, StepRecorder steps, ILogger<PilotAgent> logger)
+    public PilotAgent(
+        TerminalSession terminal,
+        PairingStore store,
+        IPilotApi api,
+        UsageMeter usage,
+        StepRecorder steps,
+        ILogger<PilotAgent> logger,
+        TimeSpan? inputReadyTimeout = null)
     {
         this.terminal = terminal;
         this.store = store;
@@ -44,6 +54,7 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
         this.usage = usage;
         this.steps = steps;
         this.logger = logger;
+        this.inputReadyTimeout = inputReadyTimeout ?? TimeSpan.FromSeconds(30);
         terminal.Output += OnOutput;
     }
 
@@ -88,7 +99,9 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
     {
         // Cycles keep their state in the API. Clearing first prevents mid-cycle auto-compaction and keeps
         // untrusted page content from lingering into the next cycle.
+        var readyBaseline = Interlocked.Read(ref inputReadyCount);
         await SendAsync(provider.ClearCommand, provider, ct);
+        await WaitForInputReadyAsync(provider, readyBaseline, ct);
         if (provider.UnattendedCommand is { } unattended)
         {
             // A shared dock session spawns interactive; args can't flip it, the in-session command can.
@@ -210,9 +223,61 @@ public sealed class PilotAgent : IPilotAgent, IDisposable
         }
     }
 
+    /// <summary>
+    /// A provider that detaches stdin while its session respawns (devin after /clear) turns typed
+    /// bytes into pasted text; its idle marker is the only reliable "reader attached" signal.
+    /// </summary>
+    private async Task WaitForInputReadyAsync(Provider provider, long baseline, CancellationToken ct)
+    {
+        if (provider.InputReadyPattern is null)
+        {
+            return;
+        }
+
+        var deadline = DateTimeOffset.UtcNow + inputReadyTimeout;
+        while (Interlocked.Read(ref inputReadyCount) == baseline && DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(50, ct);
+        }
+
+        if (Interlocked.Read(ref inputReadyCount) == baseline)
+        {
+            logger.LogWarning("{Provider} never signaled input-ready; sending anyway.", provider.Id);
+        }
+    }
+
+    private void TrackInputReady(byte[] data)
+    {
+        if (store.Current?.Provider.InputReadyPattern is not { } pattern)
+        {
+            markerTail = null;
+            return;
+        }
+
+        var scan = markerTail is { Length: > 0 } tail ? (byte[])[.. tail, .. data] : data;
+        var span = scan.AsSpan();
+        var matched = 0;
+        int hit;
+        while ((hit = span.IndexOf(pattern)) >= 0)
+        {
+            matched++;
+            span = span[(hit + pattern.Length)..];
+        }
+
+        if (matched > 0)
+        {
+            Interlocked.Add(ref inputReadyCount, matched);
+        }
+
+        // A marker can straddle two output chunks; keep the last pattern-length-minus-one bytes.
+        var keep = Math.Min(pattern.Length - 1, scan.Length);
+        markerTail = keep > 0 ? scan[^keep..] : null;
+    }
+
     private void OnOutput(byte[] data)
     {
         Interlocked.Exchange(ref lastOutputTicks, DateTimeOffset.UtcNow.Ticks);
+        TrackInputReady(data);
 
         // Only a run in flight can be stuck; output between runs is the user's own session.
         if (run is null)
