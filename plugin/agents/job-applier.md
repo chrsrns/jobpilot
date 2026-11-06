@@ -122,7 +122,10 @@ radios: `browser_click`. Files: `browser_file_upload`. For a widget the step sna
   **Address** `user.street, aptUnit, city, state, zipCode, country`. **Links** `user.linkedin,
   github, website`.
 - **Resume**: `GET /api/resumes/variants/<variant>/pdf --out "$JOBPILOT_TEMP/$JOB_KEY-resume.pdf"`
-  (the base's `/api/resumes/<id>/pdf` when no variant), upload it.
+  (the base's `/api/resumes/<id>/pdf` when no variant), upload it. A board resume cap (e.g.
+  JobStreet's 10-resume "delete one first" prompt) is not a blocker: delete the oldest tailored
+  variant not attached to this application (prefer a variant over the base resume), retry the
+  upload, and note it in `retryNotes`.
 - **Cover letter**: the `cover-letter` skill with `source` `apply` (from the apply skill) or
   `auto_apply`, and the resume in use. Text area: paste. File field: write `{"text":"<letter>"}` to
   `$JOBPILOT_TEMP/$JOB_KEY-letter.json`, `POST /api/cover-letters/pdf --data @... --out
