@@ -35,11 +35,16 @@ public sealed class TerminalSessionTests : IDisposable
 
     private FakePtyConnection Live => spawned[^1];
 
-    private TerminalSession Create(HostInstall install) => new(
+    private TerminalSession Create(
+        HostInstall install,
+        Func<IPtyConnection, bool>? canonicalProbe = null,
+        TimeSpan? inputModeTimeout = null) => new(
         install,
         new ScratchCleaner(new HostInstall(paths: null), NullLogger<ScratchCleaner>.Instance),
         NullLogger<TerminalSession>.Instance,
-        Spawn);
+        Spawn,
+        canonicalProbe,
+        inputModeTimeout);
 
     private IPtyConnection Spawn(PtyOptions options)
     {
@@ -182,6 +187,61 @@ public sealed class TerminalSessionTests : IDisposable
         var exit = Assert.Single(exits);
         Assert.True(exit.Requested);
         Assert.Null(TerminalRelay.ExitBanner(exit));
+    }
+
+    [Fact]
+    public async Task SendCommand_WaitsForRawMode_BeforeWriting()
+    {
+        // Canonical-mode ttys echo and line-buffer input; the TUI then receives "cmd\n" as pasted
+        // text where Enter never submits — so sends must wait for ICANON to clear (B73).
+        var canonical = true;
+        var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
+        using var gated = Create(new HostInstall(paths), canonicalProbe: _ => canonical);
+        gated.Start(Provider.Claude, 80, 24);
+
+        var send = gated.SendCommandAsync("/bypass", ct: TestContext.Current.CancellationToken);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        Assert.Empty(Live.Writes);
+
+        canonical = false;
+        Assert.Equal(SendResult.Sent, await send);
+        Assert.Equal(["/bypass"u8.ToArray(), Enter], Live.Writes);
+    }
+
+    [Fact]
+    public async Task SendCommand_RechecksRawMode_BeforePressingEnter()
+    {
+        // The TUI drops back to canonical mid-command (devin respawns session internals on /clear):
+        // hold the window open exactly while the written command awaits its Enter.
+        var hold = true;
+        var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
+        using var gated = Create(new HostInstall(paths), canonicalProbe: _ => hold && Live.Writes.Count == 1);
+        gated.Start(Provider.Claude, 80, 24);
+
+        var send = gated.SendCommandAsync("/clear", ct: TestContext.Current.CancellationToken);
+        await TestWait.Until(() => Live.Writes.Count == 1);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        Assert.Single(Live.Writes);
+
+        hold = false;
+        Assert.Equal(SendResult.Sent, await send);
+        Assert.Equal(["/clear"u8.ToArray(), Enter], Live.Writes);
+    }
+
+    [Fact]
+    public async Task SendCommand_SendsAnyway_WhenRawModeNeverComes()
+    {
+        var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
+        using var gated = Create(
+            new HostInstall(paths),
+            canonicalProbe: _ => true,
+            inputModeTimeout: TimeSpan.FromMilliseconds(250));
+        gated.Start(Provider.Claude, 80, 24);
+
+        var result = await gated.SendCommandAsync("/pilot x", ct: TestContext.Current.CancellationToken);
+
+        Assert.Equal(SendResult.Sent, result);
+        Assert.Equal(["/pilot x"u8.ToArray(), Enter], Live.Writes);
     }
 
     [Fact]

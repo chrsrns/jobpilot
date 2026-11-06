@@ -27,9 +27,14 @@ public sealed class TerminalSession : IDisposable
     // Sending Enter separately keeps provider TUIs from treating it as pasted text.
     private static readonly TimeSpan SubmitKeyDelay = TimeSpan.FromMilliseconds(75);
 
+    private static readonly TimeSpan InputModePoll = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan DefaultInputModeTimeout = TimeSpan.FromSeconds(30);
+
     private readonly HostInstall install;
     private readonly ScratchCleaner scratch;
     private readonly Func<PtyOptions, IPtyConnection> spawn;
+    private readonly Func<IPtyConnection, bool>? canonicalProbe;
+    private readonly TimeSpan inputModeTimeout;
     private readonly ILogger<TerminalSession> logger;
     private readonly Lock sync = new();
 
@@ -46,12 +51,16 @@ public sealed class TerminalSession : IDisposable
         HostInstall install,
         ScratchCleaner scratch,
         ILogger<TerminalSession> logger,
-        Func<PtyOptions, IPtyConnection> spawn)
+        Func<PtyOptions, IPtyConnection> spawn,
+        Func<IPtyConnection, bool>? canonicalProbe = null,
+        TimeSpan? inputModeTimeout = null)
     {
         this.install = install;
         this.scratch = scratch;
         this.logger = logger;
         this.spawn = spawn;
+        this.canonicalProbe = canonicalProbe;
+        this.inputModeTimeout = inputModeTimeout ?? DefaultInputModeTimeout;
     }
 
     public event Action<byte[]>? Output;
@@ -120,7 +129,7 @@ public sealed class TerminalSession : IDisposable
 
             Starting?.Invoke();
 
-            var process = new PtyProcess(options, spawn, logger);
+            var process = new PtyProcess(options, spawn, logger, canonicalProbe);
             process.Output += data => Output?.Invoke(data);
             process.Exited += exitCode => OnExited(process, exitCode);
             try
@@ -162,12 +171,25 @@ public sealed class TerminalSession : IDisposable
 
             process = current;
             submitKeyPresses = activeProvider.SubmitKeyPresses(command);
+        }
+
+        await WaitForRawInputAsync(process, ct);
+        lock (sync)
+        {
+            // A session replaced while waiting must not receive a command it is not running for.
+            if (current != process)
+            {
+                logger.LogWarning("Dropped a command: the session ended or was replaced while waiting for input mode.");
+                return SendResult.NotRunning;
+            }
+
             process.Write(Encoding.UTF8.GetBytes(command));
         }
 
         for (var press = 0; press < submitKeyPresses; press++)
         {
             await Task.Delay(SubmitKeyDelay, ct);
+            await WaitForRawInputAsync(process, ct);
             lock (sync)
             {
                 // A session replaced during the delay must not receive Enter for a command it never saw.
@@ -182,6 +204,26 @@ public sealed class TerminalSession : IDisposable
         }
 
         return SendResult.Sent;
+    }
+
+    /// <summary>
+    /// Holds sends while the tty is in canonical mode: written bytes echo and line-buffer, so the
+    /// TUI receives them later as pasted text and Enter never submits (devin drops back to
+    /// canonical while it respawns session internals after /clear). Fails open with a warning.
+    /// </summary>
+    private async Task WaitForRawInputAsync(PtyProcess process, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow + inputModeTimeout;
+        while (process.InputIsCanonical)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                logger.LogWarning("PTY input stayed canonical for {Seconds}s; sending anyway.", inputModeTimeout.TotalSeconds);
+                return;
+            }
+
+            await Task.Delay(InputModePoll, ct);
+        }
     }
 
     public void Write(byte[] data) => current?.Write(data);
