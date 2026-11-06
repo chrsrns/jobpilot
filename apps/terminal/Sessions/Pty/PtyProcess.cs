@@ -29,21 +29,34 @@ public sealed class PtyProcess : IDisposable
     private readonly PtyOptions options;
     private readonly Func<PtyOptions, IPtyConnection> spawn;
     private readonly ILogger logger;
+    private readonly Func<IPtyConnection, bool>? canonicalProbe;
 
     private IPtyConnection? connection;
     private volatile bool disposed;
     private int exitRaised;
 
-    public PtyProcess(PtyOptions options, Func<PtyOptions, IPtyConnection> spawn, ILogger logger)
+    public PtyProcess(
+        PtyOptions options,
+        Func<PtyOptions, IPtyConnection> spawn,
+        ILogger logger,
+        Func<IPtyConnection, bool>? canonicalProbe = null)
     {
         this.options = options;
         this.spawn = spawn;
         this.logger = logger;
+        this.canonicalProbe = canonicalProbe;
     }
 
     public event Action<byte[]>? Output;
 
     public event Action<int>? Exited;
+
+    /// <summary>
+    /// True while the child has the tty in canonical mode; bytes written then echo and line-buffer
+    /// instead of reaching the TUI as keypresses. Best-effort — a failed probe reads as raw.
+    /// </summary>
+    public bool InputIsCanonical =>
+        connection is { } active && (canonicalProbe?.Invoke(active) ?? PtyTermios.IsCanonical(active));
 
     /// <exception cref="PtyStartException">The process could not be spawned.</exception>
     public void Start()
