@@ -57,5 +57,8 @@ public abstract class Provider
     /// <summary>In-session command flipping a shared interactive session to unattended mode; null when the provider has none.</summary>
     public virtual string? UnattendedCommand => null;
 
+    /// <summary>Byte pattern the TUI emits once its input reader is attached; null when the provider has none.</summary>
+    public virtual byte[]? InputReadyPattern => null;
+
     public virtual int SubmitKeyPresses(string command) => 1;
 }

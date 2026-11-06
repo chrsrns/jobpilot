@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using Pty.Net;
 
@@ -30,9 +31,21 @@ internal sealed class FakePtyConnection : IPtyConnection
 
     public int ResizeCalls { get; private set; }
 
-    public Stream ReaderStream => Reader;
+    private PushReadStream? pushReader;
+
+    public Stream ReaderStream => pushReader ?? (Stream)Reader;
 
     public Stream WriterStream => Writer;
+
+    /// <summary>Feeds bytes through the read side like live process output; <see cref="Reader"/> stays scriptable.</summary>
+    /// <remarks>Must be called before the process starts: a blocked read never re-evaluates <see cref="ReaderStream"/>.</remarks>
+    public void EnablePushReader() => pushReader ??= new PushReadStream();
+
+    public void PushOutput(byte[] data)
+    {
+        EnablePushReader();
+        pushReader!.Push(data);
+    }
 
     public int Pid => 1;
 
@@ -93,6 +106,59 @@ internal sealed class ScriptedReadStream : Stream
     {
         pending.Wait();
         throw failure ?? new EndOfStreamException();
+    }
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => 0;
+
+    public override long Position
+    {
+        get => 0;
+        set { }
+    }
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => 0;
+
+    public override void SetLength(long value)
+    {
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+    }
+}
+
+/// <summary>Yields pushed chunks to a blocked reader, like live pty output.</summary>
+internal sealed class PushReadStream : Stream
+{
+    private readonly BlockingCollection<byte[]> chunks = new();
+    private byte[]? current;
+    private int offset;
+
+    public void Push(byte[] data) => chunks.Add(data);
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        while (current is null || this.offset >= current.Length)
+        {
+            if (!chunks.TryTake(out current, Timeout.Infinite))
+            {
+                return 0;
+            }
+
+            this.offset = 0;
+        }
+
+        var copied = Math.Min(count, current.Length - this.offset);
+        Array.Copy(current, this.offset, buffer, offset, copied);
+        this.offset += copied;
+        return copied;
     }
 
     public override bool CanRead => true;

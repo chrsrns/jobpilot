@@ -37,6 +37,14 @@ public sealed class DevinProviderTests : IDisposable
     public void UnattendedCommand_IsBypass() => Assert.Equal("/bypass", Provider.Devin.UnattendedCommand);
 
     [Fact]
+    public void InputReadyPattern_IsTheDevinIdleMarker()
+    {
+        Assert.Equal("\x1b]7501;state=idle"u8.ToArray(), Provider.Devin.InputReadyPattern);
+        Assert.Null(Provider.Claude.InputReadyPattern);
+        Assert.Null(Provider.Codex.InputReadyPattern);
+    }
+
+    [Fact]
     public void PrepareWorkspace_CopiesSkills_KeepingSetup()
     {
         temp.File(Path.Combine("plugin", "skills", "pilot", "SKILL.md"), "# pilot");
