@@ -1,2 +1,2 @@
 -- AlterEnum
-ALTER TYPE "salary_currency" ADD VALUE 'PHP';
+ALTER TYPE "salary_currency" ADD VALUE IF NOT EXISTS 'PHP';
