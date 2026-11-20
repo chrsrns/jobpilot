@@ -70,7 +70,10 @@ export function InstallGuide(): ReactElement {
 
   return (
     <Stack spacing={3}>
-      <InstallStep number={1} title={provider === "devin" ? "Sign in to Devin" : "Add the JobPilot plugin"}>
+      <InstallStep
+        number={1}
+        title={provider === "devin" ? "Sign in to Devin" : "Add the JobPilot plugin"}
+      >
         <ProviderTabs value={provider} onChange={setProvider} />
         <Typography variant="body2Muted">{PLUGIN_STEP_COPY[provider]}</Typography>
         <Stack spacing={1}>
