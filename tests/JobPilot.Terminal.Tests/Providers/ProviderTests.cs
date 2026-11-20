@@ -12,6 +12,7 @@ public class ProviderTests
     [InlineData("   ", "claude")]
     [InlineData("  Claude  ", "claude")]
     [InlineData("CoDeX", "codex")]
+    [InlineData("DEVIN", "devin")]
     public void Parse_IsCaseInsensitive_AndDefaultsToClaude(string? id, string expected)
     {
         Assert.Equal(expected, Provider.Parse(id).Id);
@@ -23,6 +24,14 @@ public class ProviderTests
     public void Parse_Throws_ForAnUnknownProvider(string id)
     {
         Assert.Throws<ArgumentException>(() => Provider.Parse(id));
+    }
+
+    [Fact]
+    public void All_ListsEveryProvider()
+    {
+        Assert.Equal(
+            [("claude", "Claude Code"), ("codex", "Codex"), ("devin", "Devin")],
+            Provider.All.Select(p => (p.Id, p.DisplayName)));
     }
 
     [Fact]
@@ -60,6 +69,7 @@ public class ProviderTests
     [Theory]
     [InlineData("claude", "/jobpilot:pilot")]
     [InlineData("codex", "$pilot")]
+    [InlineData("devin", "/pilot")]
     public void SkillCommand_UsesTheProvidersInvocationSyntax(string id, string expected)
     {
         Assert.Equal(expected, Provider.Parse(id).SkillCommand("pilot"));
@@ -69,6 +79,7 @@ public class ProviderTests
     [InlineData("claude", "/jobpilot:pilot", 1)]
     [InlineData("codex", "$pilot", 2)]
     [InlineData("codex", "Checking in", 1)]
+    [InlineData("devin", "/pilot", 1)]
     public void SubmitKeyPresses_AcceptsCodexAutocompleteFirst(string id, string command, int expected)
     {
         Assert.Equal(expected, Provider.Parse(id).SubmitKeyPresses(command));

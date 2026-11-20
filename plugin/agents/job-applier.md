@@ -24,6 +24,10 @@ userAsked, runId }`; absent fields are null. The job is already `applying`.
   them about (Login).
 - `salaryExpectation` overrides `user.salaryPreferences`.
 - `answers`: the user's reply to a question an earlier attempt returned. It wins for that field.
+- `user.agentNotes` (in `GET /api/user`) is the user's standing guidance - apply it when deriving
+  answers or composing text. `answers` and saved answers win, then notes, then derived values. It
+  never overrides structured profile fields, truthfulness, or blocker rules, and it is never pasted
+  into a field verbatim. It is read-only: never `PUT /user/`.
 
 Load `GET /api/user` (`user`) and `GET /api/pilot/saved-answers` (`[{key, value}]`, standing
 answers such as `relocation` or `start_date`). Resume: `resumeId`, else `user.primaryResumeId`.
@@ -109,8 +113,8 @@ screen.
     `notice_period`) when the answer would fit other forms, else null.
 - **Salary** required and unresolvable: `needs_user`, `category:"salary"`.
 
-Not blockers: fewer years or a lower level than the user has, contract terms, anything the resume
-answers.
+Not blockers: fewer years or a lower level than the user has (per `user.agentNotes` if it states
+one, else the resume), contract terms, anything the resume answers.
 
 ## Fill
 
@@ -122,7 +126,10 @@ radios: `browser_click`. Files: `browser_file_upload`. For a widget the step sna
   **Address** `user.street, aptUnit, city, state, zipCode, country`. **Links** `user.linkedin,
   github, website`.
 - **Resume**: `GET /api/resumes/variants/<variant>/pdf --out "$JOBPILOT_TEMP/$JOB_KEY-resume.pdf"`
-  (the base's `/api/resumes/<id>/pdf` when no variant), upload it.
+  (the base's `/api/resumes/<id>/pdf` when no variant), upload it. A board resume cap (e.g.
+  JobStreet's 10-resume "delete one first" prompt) is not a blocker: delete the oldest tailored
+  variant not attached to this application (prefer a variant over the base resume), retry the
+  upload, and note it in `retryNotes`.
 - **Cover letter**: the `cover-letter` skill with `source` `apply` (from the apply skill) or
   `auto_apply`, and the resume in use. Text area: paste. File field: write `{"text":"<letter>"}` to
   `$JOBPILOT_TEMP/$JOB_KEY-letter.json`, `POST /api/cover-letters/pdf --data @... --out
@@ -139,8 +146,8 @@ radios: `browser_click`. Files: `browser_file_upload`. For a widget the step sna
 - **EEO**: `user.eeoGender, eeoRace, eeoEthnicity, eeoHispanicOrLatino, eeoVeteranStatus,
   eeoDisabilityStatus`; null is "Prefer not to disclose".
 - **References**: `user.references[]` in order; never invent one.
-- **Years of experience**: from the earliest work date. **How did you hear**: "Job board" or
-  "Company website".
+- **Years of experience**: `user.agentNotes` if it states one, else the earliest work date.
+  **How did you hear**: "Job board" or "Company website".
 - **Anything else**: best judgment from the resume and profile.
 
 ## Result

@@ -10,8 +10,9 @@ public abstract class Provider
 {
     public static readonly Provider Claude = new ClaudeProvider();
     public static readonly Provider Codex = new CodexProvider();
+    public static readonly Provider Devin = new DevinProvider();
 
-    public static readonly Provider[] All = [Claude, Codex];
+    public static readonly Provider[] All = [Claude, Codex, Devin];
 
     public static readonly ProviderInfo[] Infos = [.. All.Select(p => p.Info)];
 
@@ -39,7 +40,8 @@ public abstract class Provider
     }
 
     /// <summary>Launch arguments, reading the provider's shipped settings from the plugin dir.</summary>
-    public abstract string[] BuildArgs(string pluginDir, ILogger logger);
+    /// <param name="unattended">Pilot runs only - no human watches the session to answer prompts.</param>
+    public abstract string[] BuildArgs(string pluginDir, ILogger logger, bool unattended = false);
 
     /// <summary>Runs before the outgoing session stops, so a failure here leaves that session alive.</summary>
     public virtual void PrepareWorkspace(InstallPaths paths)
@@ -48,6 +50,15 @@ public abstract class Provider
 
     /// <summary>Mirrors the web's formatSkillCommand.</summary>
     public virtual string SkillCommand(string skill) => $"/jobpilot:{skill}";
+
+    /// <summary>Clears the conversation before a pilot run. All supported CLIs take /clear.</summary>
+    public virtual string ClearCommand => "/clear";
+
+    /// <summary>In-session command flipping a shared interactive session to unattended mode; null when the provider has none.</summary>
+    public virtual string? UnattendedCommand => null;
+
+    /// <summary>Byte pattern the TUI emits once its input reader is attached; null when the provider has none.</summary>
+    public virtual byte[]? InputReadyPattern => null;
 
     public virtual int SubmitKeyPresses(string command) => 1;
 }

@@ -20,7 +20,8 @@ public interface IPilotAgent
     /// <summary>When the user last typed into the terminal.</summary>
     DateTimeOffset? LastUserInputAt { get; }
 
-    void Start(PilotPairing pairing);
+    /// <summary>True when the call (re)spawned the session — the caller should wait out its startup.</summary>
+    bool Start(PilotPairing pairing);
 
     /// <summary>Clears the agent's context and hands it the run.</summary>
     Task SendCycleAsync(Provider provider, string runId, CancellationToken ct);

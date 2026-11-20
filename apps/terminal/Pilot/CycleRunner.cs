@@ -94,9 +94,10 @@ internal sealed class CycleRunner(IPilotAgent agent, IPilotApi api, TimeProvider
             return TimeSpan.FromSeconds(CycleSleep.MinSeconds);
         }
 
-        if (running is null)
+        // Always run Start: it no-ops on a matching session and upgrades an interactive one to
+        // unattended, which must happen before SendCycleAsync types into it.
+        if (agent.Start(pairing))
         {
-            agent.Start(pairing);
             await Task.Delay(StartupGrace, time, ct);
         }
 

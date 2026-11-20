@@ -18,6 +18,21 @@ import { HostInstallCommands } from "./host-install-commands";
 import { PLUGIN_COMMANDS } from "./provider-commands";
 import { ProviderTabs } from "./provider-tabs";
 
+const PLUGIN_STEP_COPY: Record<TerminalProviderId, string> = {
+  claude: "Run these in Claude Code. The terminal, desktop app, and VS Code extension all work.",
+  codex: "Run these in a terminal where the Codex CLI is installed.",
+  devin: "No plugin to install — sign in once, and the agent gets its skills when it starts.",
+};
+
+const SETUP_STEP_COPY: Record<TerminalProviderId, string> = {
+  claude:
+    "In the same Claude Code session, run setup. It installs the JobPilot agent on your computer and starts it. If it's already installed, setup updates it. This is the only command you need to type.",
+  codex:
+    "Start a new Codex session and run $setup. It installs the JobPilot agent on your computer and starts it. If it's already installed, setup updates it. This is the only command you need to type.",
+  devin:
+    "Start a new Devin session and run /setup. It installs the JobPilot agent on your computer and starts it. If it's already installed, setup updates it. This is the only command you need to type.",
+};
+
 interface InstallStepProps {
   number: number;
   title: string;
@@ -55,13 +70,12 @@ export function InstallGuide(): ReactElement {
 
   return (
     <Stack spacing={3}>
-      <InstallStep number={1} title="Add the JobPilot plugin">
+      <InstallStep
+        number={1}
+        title={provider === "devin" ? "Sign in to Devin" : "Add the JobPilot plugin"}
+      >
         <ProviderTabs value={provider} onChange={setProvider} />
-        <Typography variant="body2Muted">
-          {provider === "claude"
-            ? "Run these in Claude Code. The terminal, desktop app, and VS Code extension all work."
-            : "Run these in a terminal where the Codex CLI is installed."}
-        </Typography>
+        <Typography variant="body2Muted">{PLUGIN_STEP_COPY[provider]}</Typography>
         <Stack spacing={1}>
           {PLUGIN_COMMANDS[provider].map((command) => (
             <CopyField
@@ -75,11 +89,7 @@ export function InstallGuide(): ReactElement {
       </InstallStep>
 
       <InstallStep number={2} title="Run setup">
-        <Typography variant="body2Muted">
-          {provider === "claude"
-            ? "In the same Claude Code session, run setup. It installs the JobPilot agent on your computer and starts it. If it's already installed, setup updates it. This is the only command you need to type."
-            : "Start a new Codex session and run $setup. It installs the JobPilot agent on your computer and starts it. If it's already installed, setup updates it. This is the only command you need to type."}
-        </Typography>
+        <Typography variant="body2Muted">{SETUP_STEP_COPY[provider]}</Typography>
         <CopyField
           value={formatSkillCommand(provider, "setup")}
           copyMessage="Command copied"

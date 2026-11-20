@@ -6,8 +6,9 @@ using JobPilot.Terminal.Pilot.Telemetry;
 using JobPilot.Terminal.Sessions;
 using Microsoft.Extensions.Logging.Abstractions;
 
-// Pty.Net's macOS forkpty path requires CoreCLR's W^X remapping to be off; harmless under NativeAOT.
-if (OperatingSystem.IsMacOS())
+// Pty.Net refuses to spawn without this env var. The real W^X toggle is read at CLR boot, so
+// CoreCLR hosts get it from runtimeconfig.template.json; this set only satisfies Pty.Net's check.
+if (!OperatingSystem.IsWindows())
 {
     Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
 }

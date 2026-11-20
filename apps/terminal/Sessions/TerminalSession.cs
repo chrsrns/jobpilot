@@ -27,14 +27,20 @@ public sealed class TerminalSession : IDisposable
     // Sending Enter separately keeps provider TUIs from treating it as pasted text.
     private static readonly TimeSpan SubmitKeyDelay = TimeSpan.FromMilliseconds(75);
 
+    private static readonly TimeSpan InputModePoll = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan DefaultInputModeTimeout = TimeSpan.FromSeconds(30);
+
     private readonly HostInstall install;
     private readonly ScratchCleaner scratch;
     private readonly Func<PtyOptions, IPtyConnection> spawn;
+    private readonly Func<IPtyConnection, bool>? canonicalProbe;
+    private readonly TimeSpan inputModeTimeout;
     private readonly ILogger<TerminalSession> logger;
     private readonly Lock sync = new();
 
     private volatile PtyProcess? current;
     private volatile Provider activeProvider = Provider.Claude;
+    private bool activeUnattended;
 
     public TerminalSession(HostInstall install, ScratchCleaner scratch, ILogger<TerminalSession> logger)
         : this(install, scratch, logger, PtyProcess.SpawnWithPtyNet)
@@ -45,12 +51,16 @@ public sealed class TerminalSession : IDisposable
         HostInstall install,
         ScratchCleaner scratch,
         ILogger<TerminalSession> logger,
-        Func<PtyOptions, IPtyConnection> spawn)
+        Func<PtyOptions, IPtyConnection> spawn,
+        Func<IPtyConnection, bool>? canonicalProbe = null,
+        TimeSpan? inputModeTimeout = null)
     {
         this.install = install;
         this.scratch = scratch;
         this.logger = logger;
         this.spawn = spawn;
+        this.canonicalProbe = canonicalProbe;
+        this.inputModeTimeout = inputModeTimeout ?? DefaultInputModeTimeout;
     }
 
     public event Action<byte[]>? Output;
@@ -66,16 +76,18 @@ public sealed class TerminalSession : IDisposable
     public Provider ActiveProvider => activeProvider;
 
     /// <summary>Starts a provider unless it is already running, replacing any other one.</summary>
+    /// <returns>True when a new process spawned (fresh start or respawn), false on a no-op.</returns>
     /// <exception cref="PtyStartException">The process could not be spawned.</exception>
-    public void Start(Provider provider, int cols, int rows, ApiConnection api)
+    public bool Start(Provider provider, int cols, int rows, ApiConnection api, bool unattended = false)
     {
         lock (sync)
         {
             var paths = install.RequirePaths();
-            if (current is not null && provider == activeProvider)
+            // An unattended request upgrades an interactive session; a normal start never downgrades one.
+            if (current is not null && provider == activeProvider && (!unattended || activeUnattended))
             {
                 logger.LogInformation("{Provider} session already running; Start is a no-op.", provider.Id);
-                return;
+                return false;
             }
 
             // Before the outgoing session stops, so a failed preparation leaves it alive.
@@ -83,13 +95,18 @@ public sealed class TerminalSession : IDisposable
 
             if (current is not null)
             {
-                logger.LogInformation("Switching terminal provider from {Previous} to {Next}.", activeProvider.Id, provider.Id);
+                logger.LogInformation(
+                    "Replacing {Previous} session with {Next} (unattended {PrevMode} -> {NextMode}).",
+                    activeProvider.Id,
+                    provider.Id,
+                    activeUnattended,
+                    unattended);
                 current.Dispose();
                 current = null;
             }
 
             scratch.CleanForNewSession(paths);
-            var args = provider.BuildArgs(paths.PluginDir, logger);
+            var args = provider.BuildArgs(paths.PluginDir, logger, unattended);
             logger.LogInformation(
                 "Starting {Provider}: cwd={Cwd} executable={Executable} args={Args} cols={Cols} rows={Rows}",
                 provider.DisplayName,
@@ -112,7 +129,7 @@ public sealed class TerminalSession : IDisposable
 
             Starting?.Invoke();
 
-            var process = new PtyProcess(options, spawn, logger);
+            var process = new PtyProcess(options, spawn, logger, canonicalProbe);
             process.Output += data => Output?.Invoke(data);
             process.Exited += exitCode => OnExited(process, exitCode);
             try
@@ -127,6 +144,8 @@ public sealed class TerminalSession : IDisposable
 
             current = process;
             activeProvider = provider;
+            activeUnattended = unattended;
+            return true;
         }
     }
 
@@ -152,12 +171,25 @@ public sealed class TerminalSession : IDisposable
 
             process = current;
             submitKeyPresses = activeProvider.SubmitKeyPresses(command);
+        }
+
+        await WaitForRawInputAsync(process, ct);
+        lock (sync)
+        {
+            // A session replaced while waiting must not receive a command it is not running for.
+            if (current != process)
+            {
+                logger.LogWarning("Dropped a command: the session ended or was replaced while waiting for input mode.");
+                return SendResult.NotRunning;
+            }
+
             process.Write(Encoding.UTF8.GetBytes(command));
         }
 
         for (var press = 0; press < submitKeyPresses; press++)
         {
             await Task.Delay(SubmitKeyDelay, ct);
+            await WaitForRawInputAsync(process, ct);
             lock (sync)
             {
                 // A session replaced during the delay must not receive Enter for a command it never saw.
@@ -172,6 +204,26 @@ public sealed class TerminalSession : IDisposable
         }
 
         return SendResult.Sent;
+    }
+
+    /// <summary>
+    /// Holds sends while the tty is in canonical mode: written bytes echo and line-buffer, so the
+    /// TUI receives them later as pasted text and Enter never submits (devin drops back to
+    /// canonical while it respawns session internals after /clear). Fails open with a warning.
+    /// </summary>
+    private async Task WaitForRawInputAsync(PtyProcess process, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow + inputModeTimeout;
+        while (process.InputIsCanonical)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                logger.LogWarning("PTY input stayed canonical for {Seconds}s; sending anyway.", inputModeTimeout.TotalSeconds);
+                return;
+            }
+
+            await Task.Delay(InputModePoll, ct);
+        }
     }
 
     public void Write(byte[] data) => current?.Write(data);

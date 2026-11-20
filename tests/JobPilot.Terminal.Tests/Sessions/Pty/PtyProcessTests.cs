@@ -53,6 +53,25 @@ public sealed class PtyProcessTests
     }
 
     [Fact]
+    public async Task InputIsCanonical_TracksTheSlaveTermios()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // ConPTY has no canonical mode
+        }
+
+        // Pty.Net's own check; the CLR knob it needs lives in this project's runtimeconfig.
+        Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
+        var options = PtyProcess.BuildOptions(
+            "sh", ["-c", "sleep 1; stty raw -echo; sleep 5"], ".", 80, 24, binDir: null, new Dictionary<string, string>());
+        using var pty = new PtyProcess(options, PtyProcess.SpawnWithPtyNet, NullLogger.Instance);
+        pty.Start();
+
+        await TestWait.Until(() => pty.InputIsCanonical);   // a fresh slave starts canonical
+        await TestWait.Until(() => !pty.InputIsCanonical);  // stty raw clears it
+    }
+
+    [Fact]
     public void Start_ShowsTheFailure_AndThrows_WhenTheProcessCannotSpawn()
     {
         var pty = new PtyProcess(SpawnOptions, _ => throw new FileNotFoundException("not on PATH"), NullLogger.Instance);

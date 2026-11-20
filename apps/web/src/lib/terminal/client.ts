@@ -7,7 +7,7 @@ export const TERMINAL_WS_URL = `${TERMINAL_HTTP_URL.replace(/^http/, "ws")}/ws`;
 /** URL scheme the host registers on Windows; opening it relaunches an offline host from the browser. */
 export const TERMINAL_PROTOCOL_URL = "jobpilot://start";
 
-export type TerminalProviderId = "claude" | "codex";
+export type TerminalProviderId = "claude" | "codex" | "devin";
 
 interface TerminalProviderInfo {
   id: TerminalProviderId;
@@ -143,8 +143,20 @@ export function triggerUpdate(): Promise<UpdateResult> {
   return send<UpdateResult>("POST", "/update");
 }
 
+const SKILL_PREFIX: Record<TerminalProviderId, string> = {
+  claude: "/jobpilot:",
+  codex: "$",
+  devin: "/",
+};
+
+const PROVIDER_LABELS: Record<TerminalProviderId, string> = {
+  claude: "Claude Code",
+  codex: "Codex",
+  devin: "Devin",
+};
+
 export function providerDisplayName(provider: TerminalProviderId): string {
-  return provider === "codex" ? "Codex" : "Claude Code";
+  return PROVIDER_LABELS[provider];
 }
 
 export function formatSkillCommand(
@@ -153,6 +165,6 @@ export function formatSkillCommand(
   args?: string,
 ): string {
   const suffix = args?.trim();
-  const command = provider === "codex" ? `$${skill}` : `/jobpilot:${skill}`;
+  const command = SKILL_PREFIX[provider] + skill;
   return suffix ? `${command} ${suffix}` : command;
 }
