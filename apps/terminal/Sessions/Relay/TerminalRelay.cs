@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using JobPilot.Terminal.Hosting;
 using JobPilot.Terminal.Pilot.Agent;
 
 namespace JobPilot.Terminal.Sessions.Relay;
