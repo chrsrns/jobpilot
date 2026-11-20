@@ -1,40 +1,44 @@
 using System.Text;
-using JobPilot.Terminal.Hosting;
-using JobPilot.Terminal.Pilot;
+using JobPilot.Terminal.Install;
+using JobPilot.Terminal.Pilot.Agent;
+using JobPilot.Terminal.Pilot.Pairing;
+using JobPilot.Terminal.Pilot.Telemetry;
 using JobPilot.Terminal.Providers;
 using JobPilot.Terminal.Sessions;
+using JobPilot.Terminal.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Pty.Net;
 using Xunit;
-using static JobPilot.Terminal.Tests.Builders;
+using static JobPilot.Terminal.Tests.Support.Builders;
 
-namespace JobPilot.Terminal.Tests;
+namespace JobPilot.Terminal.Tests.Pilot.Agent;
 
-public sealed class PilotSessionTests : IDisposable
+public sealed class PilotAgentCycleTests : IDisposable
 {
     private readonly TempDir temp = new();
     private readonly List<FakePtyConnection> spawned = [];
     private readonly TerminalSession terminal;
-    private readonly PilotStore store;
-    private readonly PilotSession pilot;
+    private readonly PairingStore store;
+    private readonly PilotAgent pilot;
 
-    public PilotSessionTests()
+    public PilotAgentCycleTests()
     {
         temp.WriteValidPluginTree();
-        var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
+        var install = new HostInstall(temp.Paths);
         terminal = new TerminalSession(
-            new HostInstall(paths),
+            install,
             new ScratchCleaner(new HostInstall(paths: null), NullLogger<ScratchCleaner>.Instance),
             NullLogger<TerminalSession>.Instance,
             Spawn);
-        store = new PilotStore(Path.Combine(temp.Root, "pilot.json"), NullLogger<PilotStore>.Instance);
-        var api = new PilotApi(new HttpClient(), NullLogger<PilotApi>.Instance);
-        pilot = new PilotSession(
+        store = new PairingStore(install, NullLogger<PairingStore>.Instance);
+        var api = new FakePilot();
+        pilot = new PilotAgent(
             terminal,
             store,
             api,
             new UsageMeter(),
-            NullLogger<PilotSession>.Instance,
+            new StepRecorder(api),
+            NullLogger<PilotAgent>.Instance,
             inputReadyTimeout: TimeSpan.FromMilliseconds(400));
     }
 
@@ -61,12 +65,12 @@ public sealed class PilotSessionTests : IDisposable
     [Fact]
     public async Task SendCycle_WaitsForTheDevinIdleMarker_AfterClear()
     {
-        var settings = Settings() with { Provider = Provider.Devin };
-        store.Save(settings);
-        pilot.Start(settings);
+        var pairing = NewPairing() with { Provider = Provider.Devin };
+        store.Save(pairing);
+        pilot.Start(pairing);
         var conn = Live;
 
-        var cycle = pilot.SendCycleAsync(settings, "run-1", TestContext.Current.CancellationToken);
+        var cycle = pilot.SendCycleAsync(pairing.Provider, "run-1", TestContext.Current.CancellationToken);
         await TestWait.Until(() => Written(conn).Contains("/clear"));
         await Task.Delay(300, TestContext.Current.CancellationToken);
         Assert.DoesNotContain("/bypass", Written(conn));
@@ -84,12 +88,12 @@ public sealed class PilotSessionTests : IDisposable
     [Fact]
     public async Task SendCycle_SendsAnyway_WhenTheIdleMarkerNeverComes()
     {
-        var settings = Settings() with { Provider = Provider.Devin };
-        store.Save(settings);
-        pilot.Start(settings);
+        var pairing = NewPairing() with { Provider = Provider.Devin };
+        store.Save(pairing);
+        pilot.Start(pairing);
         var conn = Live;
 
-        await pilot.SendCycleAsync(settings, "run-2", TestContext.Current.CancellationToken);
+        await pilot.SendCycleAsync(pairing.Provider, "run-2", TestContext.Current.CancellationToken);
 
         var written = Written(conn);
         Assert.Contains("/bypass", written);
@@ -99,12 +103,12 @@ public sealed class PilotSessionTests : IDisposable
     [Fact]
     public async Task SendCycle_DoesNotWaitForAMarker_WhenTheProviderHasNone()
     {
-        var settings = Settings() with { Provider = Provider.Claude };
-        store.Save(settings);
-        pilot.Start(settings);
+        var pairing = NewPairing() with { Provider = Provider.Claude };
+        store.Save(pairing);
+        pilot.Start(pairing);
         var conn = Live;
 
-        await pilot.SendCycleAsync(settings, "run-3", TestContext.Current.CancellationToken);
+        await pilot.SendCycleAsync(pairing.Provider, "run-3", TestContext.Current.CancellationToken);
 
         Assert.Contains("/jobpilot:pilot run-3", Written(conn));
     }

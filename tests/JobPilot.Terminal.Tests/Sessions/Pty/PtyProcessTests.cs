@@ -1,6 +1,7 @@
 using JobPilot.Terminal.Sessions.Pty;
 using JobPilot.Terminal.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
+using Pty.Net;
 using Xunit;
 using static JobPilot.Terminal.Tests.Support.Builders;
 
@@ -62,8 +63,19 @@ public sealed class PtyProcessTests
 
         // Pty.Net's own check; the CLR knob it needs lives in this project's runtimeconfig.
         Environment.SetEnvironmentVariable("DOTNET_EnableWriteXorExecute", "0");
-        var options = PtyProcess.BuildOptions(
-            "sh", ["-c", "sleep 1; stty raw -echo; sleep 5"], ".", 80, 24, binDir: null, new Dictionary<string, string>());
+        var options = new PtyOptions
+        {
+            App = "sh",
+            CommandLine = ["-c", "sleep 1; stty raw -echo; sleep 5"],
+            Cwd = ".",
+            Cols = 80,
+            Rows = 24,
+            Environment = new Dictionary<string, string>
+            {
+                ["TERM"] = "xterm-256color",
+                ["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin",
+            },
+        };
         using var pty = new PtyProcess(options, PtyProcess.SpawnWithPtyNet, NullLogger.Instance);
         pty.Start();
 

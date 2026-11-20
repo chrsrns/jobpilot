@@ -1,16 +1,14 @@
 using System.Text.Json;
-using JobPilot.Terminal.Hosting;
 using JobPilot.Terminal.Providers;
+using JobPilot.Terminal.Tests.Support;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace JobPilot.Terminal.Tests;
+namespace JobPilot.Terminal.Tests.Providers;
 
 public sealed class DevinProviderTests : IDisposable
 {
     private readonly TempDir temp = new();
-
-    private InstallPaths Paths =>
-        new() { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
 
     public void Dispose() => temp.Dispose();
 
@@ -19,7 +17,7 @@ public sealed class DevinProviderTests : IDisposable
     {
         Assert.Equal(
             ["--permission-mode", "smart", "--respect-workspace-trust", "false"],
-            Provider.Devin.BuildArgs(temp.Root, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance));
+            Provider.Devin.BuildArgs(temp.Root, NullLogger.Instance));
     }
 
     [Fact]
@@ -27,10 +25,7 @@ public sealed class DevinProviderTests : IDisposable
     {
         Assert.Equal(
             ["--permission-mode", "bypass", "--respect-workspace-trust", "false"],
-            Provider.Devin.BuildArgs(
-                temp.Root,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
-                unattended: true));
+            Provider.Devin.BuildArgs(temp.Root, NullLogger.Instance, unattended: true));
     }
 
     [Fact]
@@ -51,7 +46,7 @@ public sealed class DevinProviderTests : IDisposable
         temp.File(Path.Combine("plugin", "skills", "setup", "SKILL.md"), "# setup");
         temp.File(Path.Combine("plugin", "skills", "_shared", "setup.md"), "# shared");
 
-        Provider.Devin.PrepareWorkspace(Paths);
+        Provider.Devin.PrepareWorkspace(temp.Paths);
 
         Assert.True(File.Exists(Path.Combine(temp.Root, ".agents", "skills", "pilot", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(temp.Root, ".agents", "skills", "setup", "SKILL.md")));
@@ -71,7 +66,7 @@ public sealed class DevinProviderTests : IDisposable
             }}
             """);
 
-        Provider.Devin.PrepareWorkspace(Paths);
+        Provider.Devin.PrepareWorkspace(temp.Paths);
 
         var config = Path.Combine(temp.Root, ".devin", "mcp_config.local.json");
         Assert.True(File.Exists(config));
@@ -93,7 +88,7 @@ public sealed class DevinProviderTests : IDisposable
     {
         temp.File(Path.Combine("plugin", "skills", "pilot", "SKILL.md"), "# pilot");
 
-        Provider.Devin.PrepareWorkspace(Paths);
+        Provider.Devin.PrepareWorkspace(temp.Paths);
 
         Assert.False(File.Exists(Path.Combine(temp.Root, ".devin", "mcp_config.local.json")));
     }

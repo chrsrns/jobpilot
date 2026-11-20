@@ -87,14 +87,14 @@ public sealed class TerminalSessionTests : IDisposable
         Start(Provider.Devin);
         var interactive = Live;
 
-        session.Start(Provider.Devin, 80, 24, unattended: true);
+        session.Start(Provider.Devin, 80, 24, Builders.Api, unattended: true);
 
         Assert.Equal(2, spawned.Count);
         Assert.Equal(1, interactive.KillCalls);
         Assert.Contains("bypass", lastOptions!.CommandLine);
 
         // A plain start on the unattended session is a no-op, not a downgrade.
-        session.Start(Provider.Devin, 80, 24);
+        session.Start(Provider.Devin, 80, 24, Builders.Api);
         Assert.Equal(2, spawned.Count);
     }
 
@@ -197,7 +197,7 @@ public sealed class TerminalSessionTests : IDisposable
         var canonical = true;
         var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
         using var gated = Create(new HostInstall(paths), canonicalProbe: _ => canonical);
-        gated.Start(Provider.Claude, 80, 24);
+        gated.Start(Provider.Claude, 80, 24, Builders.Api);
 
         var send = gated.SendCommandAsync("/bypass", ct: TestContext.Current.CancellationToken);
         await Task.Delay(300, TestContext.Current.CancellationToken);
@@ -216,7 +216,7 @@ public sealed class TerminalSessionTests : IDisposable
         var hold = true;
         var paths = new InstallPaths { WorkingDir = temp.Root, PluginDir = Path.Combine(temp.Root, "plugin") };
         using var gated = Create(new HostInstall(paths), canonicalProbe: _ => hold && Live.Writes.Count == 1);
-        gated.Start(Provider.Claude, 80, 24);
+        gated.Start(Provider.Claude, 80, 24, Builders.Api);
 
         var send = gated.SendCommandAsync("/clear", ct: TestContext.Current.CancellationToken);
         await TestWait.Until(() => Live.Writes.Count == 1);
@@ -236,7 +236,7 @@ public sealed class TerminalSessionTests : IDisposable
             new HostInstall(paths),
             canonicalProbe: _ => true,
             inputModeTimeout: TimeSpan.FromMilliseconds(250));
-        gated.Start(Provider.Claude, 80, 24);
+        gated.Start(Provider.Claude, 80, 24, Builders.Api);
 
         var result = await gated.SendCommandAsync("/pilot x", ct: TestContext.Current.CancellationToken);
 
